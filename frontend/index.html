@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园组队平台</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Helvetica Neue', 'Arial', 'sans-serif';
+            background-color: #ffffff;
+            color: #333333;
+            overflow-x: hidden;
+        }
+
+        #app {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 底部导航栏 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: #ffffff;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            padding: 10px 0;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: #666666;
+            transition: color 0.3s;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: #007aff;
+        }
+
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 4px;
+        }
+
+        .nav-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .nav-item span {
+            font-size: 12px;
+        }
+
+        /* 页面容器 */
+        .page {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 70px;
+        }
+
+        /* 首页样式 */
+        .home-page {
+            padding: 20px;
+        }
+
+        .header {
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            background: #ffffff;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s;
+        }
+
+        .filter-btn.active {
+            background: #007aff;
+            color: #ffffff;
+            border-color: #007aff;
+        }
+
+        .activity-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .activity-card {
+            background: #ffffff;
+            border: 1px solid #f0f0f0;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: box-shadow 0.3s;
+        }
+
+        .activity-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .activity-type {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .type-study {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .type-sports {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .type-volunteer {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .type-meal {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .type-hobby {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .activity-status {
+            font-size: 12px;
+            color: #4caf50;
+        }
+
+        .activity-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .activity-desc {
+            font-size: 14px;
+            color: #666666;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .activity-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #999999;
+        }
+
+        .activity-members {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 发布页面 */
+        .publish-page {
+            padding: 20px;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            margin-right: 16px;
+        }
+
+        .page-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #007aff;
+        }
+
+        .form-group textarea {
+            resize: none;
+            height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: #007aff;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            background: #0066cc;
+        }
+
+        /* 个人中心 */
+        .profile-page {
+            padding: 20px;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #e3f2fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-right: 16px;
+        }
+
+        .profile-info h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .profile-info p {
+            font-size: 14px;
+            color: #666666;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #007aff;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666666;
+        }
+
+        .menu-list {
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            color: #007aff;
+        }
+
+        .menu-text {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .menu-arrow {
+            color: #999999;
+        }
+
+        /* 活动详情 */
+        .detail-page {
+            padding: 20px;
+        }
+
+        .detail-header {
+            margin-bottom: 20px;
+        }
+
+        .detail-type {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        .detail-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .detail-desc {
+            font-size: 15px;
+            color: #666666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .detail-meta {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .meta-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .meta-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            color: #007aff;
+        }
+
+        .members-section {
+            margin-bottom: 80px;
+        }
+
+        .members-section h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .members-list {
+            display: flex;
+            gap: 16px;
+        }
+
+        .member-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .member-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #e3f2fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 6px;
+        }
+
+        .member-name {
+            font-size: 12px;
+            color: #666666;
+        }
+
+        .join-btn-container {
+            position: fixed;
+            bottom: 70px;
+            left: 0;
+            right: 0;
+            padding: 16px 20px;
+            background: #ffffff;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .join-btn {
+            width: 100%;
+            padding: 14px;
+            background: #4caf50;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .join-btn:hover {
+            background: #45a049;
+        }
+
+        /* 成功页面 */
+        .success-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+        }
+
+        .success-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .success-page h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .success-page p {
+            font-size: 16px;
+            color: #666666;
+            margin-bottom: 32px;
+        }
+
+        .success-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            max-width: 280px;
+        }
+
+        .btn-primary {
+            padding: 14px 24px;
+            background: #007aff;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            padding: 14px 24px;
+            background: #f5f5f5;
+            color: #333333;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        /* 无活动页面 */
+        .no-activity-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+        }
+
+        .no-activity-icon {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 24px;
+            opacity: 0.6;
+        }
+
+        .no-activity-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .no-activity-page h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333333;
+            margin-bottom: 12px;
+        }
+
+        .no-activity-page p {
+            font-size: 14px;
+            color: #666666;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+
+        .no-activity-btn {
+            padding: 12px 32px;
+            background: #007aff;
+            color: #ffffff;
+            border: none;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .no-activity-btn:hover {
+            background: #0066cc;
+        }
+
+        /* 聊天页面 */
+        .chat-page {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f5f5;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .chat-header h3 {
+            flex: 1;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 16px;
+        }
+
+        .message.own {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #e3f2fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            margin: 0 10px;
+        }
+
+        .message-content {
+            max-width: 70%;
+        }
+
+        .message-bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .message:not(.own) .message-bubble {
+            background: #ffffff;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.own .message-bubble {
+            background: #007aff;
+            color: #ffffff;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #999999;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 12px 16px;
+            background: #ffffff;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            font-size: 14px;
+            outline: none;
+            margin-right: 10px;
+        }
+
+        .send-btn {
+            padding: 10px 20px;
+            background: #007aff;
+            color: #ffffff;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="page">
+            <!-- 首页 -->
+            <div v-if="currentPage === 'home'" class="home-page">
+                <div class="header">
+                    <h1>校园组队</h1>
+                    <div class="filter-bar">
+                        <button v-for="filter in filters" :key="filter.value" class="filter-btn"
+                            :class="{ active: currentFilter === filter.value }" @click="currentFilter = filter.value">
+                            {{ filter.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="activity-list">
+                    <div v-for="activity in filteredActivities" :key="activity.id" class="activity-card"
+                        @click="goToDetail(activity)">
+                        <div class="activity-header">
+                            <span class="activity-type" :class="'type-' + activity.type">
+                                {{ getTypeLabel(activity.type) }}
+                            </span>
+                            <span class="activity-status">招募中</span>
+                        </div>
+                        <h3 class="activity-title">{{ activity.title }}</h3>
+                        <p class="activity-desc">{{ activity.description }}</p>
+                        <div class="activity-meta">
+                            <span>{{ activity.location }} · {{ activity.time }}</span>
+                            <div class="activity-members">
+                                <span>{{ activity.currentMembers }}/{{ activity.targetMembers }}人</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 发布页面 -->
+            <div v-if="currentPage === 'publish'" class="publish-page">
+                <div class="page-header">
+                    <button class="back-btn" @click="currentPage = 'home'">←</button>
+                    <h2>发布活动</h2>
+                </div>
+
+                <form @submit.prevent="publishActivity">
+                    <div class="form-group">
+                        <label>活动类型</label>
+                        <select v-model="form.type">
+                            <option value="">选择类型</option>
+                            <option value="study">📚 学习</option>
+                            <option value="sports">🏀 运动</option>
+                            <option value="volunteer">🤝 志愿</option>
+                            <option value="meal">🍚 约饭</option>
+                            <option value="hobby">🎨 兴趣</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>活动标题</label>
+                        <input v-model="form.title" type="text" placeholder="输入活动名称">
+                    </div>
+
+                    <div class="form-group">
+                        <label>活动地点</label>
+                        <input v-model="form.location" type="text" placeholder="输入活动地点">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>目标人数</label>
+                            <select v-model="form.targetMembers">
+                                <option value="2">2人</option>
+                                <option value="3">3人</option>
+                                <option value="4">4人</option>
+                                <option value="5">5人以上</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>活动时间</label>
+                            <select v-model="form.time">
+                                <option value="今天">今天</option>
+                                <option value="明天">明天</option>
+                                <option value="周末">周末</option>
+                                <option value="自定义">自定义</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>活动描述</label>
+                        <textarea v-model="form.description" placeholder="描述一下你的活动需求..."></textarea>
+                    </div>
+
+                    <button type="submit" class="submit-btn">发布活动</button>
+                </form>
+            </div>
+
+            <!-- 个人中心 -->
+            <div v-if="currentPage === 'profile'" class="profile-page">
+                <div class="profile-header">
+                    <div class="avatar">👤</div>
+                    <div class="profile-info">
+                        <h3>张三</h3>
+                        <p>计算机学院 · 2021级</p>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">12</div>
+                        <div class="stat-label">参与活动</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">5</div>
+                        <div class="stat-label">发布活动</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">98%</div>
+                        <div class="stat-label">好评率</div>
+                    </div>
+                </div>
+
+                <div class="menu-list">
+                    <div class="menu-item">
+                        <span class="menu-text">我的活动</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item">
+                        <span class="menu-text">消息通知</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                    <div class="menu-item">
+                        <span class="menu-text">设置</span>
+                        <span class="menu-arrow">›</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 活动详情 -->
+            <div v-if="currentPage === 'detail'" class="detail-page">
+                <div class="detail-header">
+                    <button class="back-btn" @click="currentPage = 'home'">←</button>
+                </div>
+
+                <div v-if="selectedActivity">
+                    <span class="detail-type" :class="'type-' + selectedActivity.type">
+                        {{ getTypeLabel(selectedActivity.type) }}
+                    </span>
+                    <h2 class="detail-title">{{ selectedActivity.title }}</h2>
+                    <p class="detail-desc">{{ selectedActivity.description }}</p>
+
+                    <div class="detail-meta">
+                        <div class="meta-item">
+                            <span class="meta-icon">📍</span>
+                            <span>{{ selectedActivity.location }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-icon">📅</span>
+                            <span>{{ selectedActivity.time }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-icon">👥</span>
+                            <span>{{ selectedActivity.currentMembers }}/{{ selectedActivity.targetMembers }}人</span>
+                        </div>
+                    </div>
+
+                    <div class="members-section">
+                        <h4>已加入成员</h4>
+                        <div class="members-list">
+                            <div class="member-item" v-for="n in selectedActivity.currentMembers" :key="n">
+                                <div class="member-avatar">👤</div>
+                                <span class="member-name">成员{{ n }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="join-btn-container">
+                        <button class="join-btn" @click="joinActivity">一键加入</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 成功页面 -->
+            <div v-if="currentPage === 'success'" class="success-page">
+                <div class="success-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" fill="#4CAF50" />
+                        <path d="M7 12L10 15L17 8" stroke="white" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <h1>{{ successTitle }}</h1>
+                <p>{{ successMessage }}</p>
+                <div class="success-buttons">
+                    <button class="btn-primary" @click="currentPage = 'home'">返回首页</button>
+                    <button v-if="showChatButton" class="btn-secondary" @click="currentPage = 'chat'">进入聊天</button>
+                </div>
+            </div>
+
+            <!-- 无活动页面 -->
+            <div v-if="currentPage === 'no-activity'" class="no-activity-page">
+                <div class="no-activity-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#999999" stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        <line x1="9" y1="10" x2="15" y2="10"></line>
+                    </svg>
+                </div>
+                <h2>暂无活动</h2>
+                <p>您还没有加入任何活动<br>快去首页寻找感兴趣的活动吧！</p>
+                <button class="no-activity-btn" @click="currentPage = 'home'">返回首页</button>
+            </div>
+
+            <!-- 聊天页面 -->
+            <div v-if="currentPage === 'chat'" class="chat-page">
+                <div class="chat-header">
+                    <button class="back-btn" @click="currentPage = 'home'">←</button>
+                    <h3>{{ currentChatActivity ? currentChatActivity.title : '队伍聊天' }}</h3>
+                    <div style="width: 40px;"></div>
+                </div>
+
+                <div class="chat-messages">
+                    <div class="message" v-for="(msg, index) in messages" :key="index" :class="{ own: msg.own }">
+                        <div class="message-avatar">{{ msg.own ? '我' : '👤' }}</div>
+                        <div class="message-content">
+                            <div class="message-bubble">{{ msg.text }}</div>
+                            <div class="message-time">{{ msg.time }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input">
+                    <input v-model="newMessage" type="text" placeholder="输入消息..." @keyup.enter="sendMessage">
+                    <button class="send-btn" @click="sendMessage">发送</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <nav class="bottom-nav" v-if="showBottomNav">
+            <div class="nav-item" :class="{ active: currentPage === 'home' }" @click="currentPage = 'home'">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>
+                <span>首页</span>
+            </div>
+            <div class="nav-item" :class="{ active: currentPage === 'publish' }" @click="currentPage = 'publish'">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                </div>
+                <span>发布</span>
+            </div>
+            <div class="nav-item" :class="{ active: currentPage === 'chat' }" @click="goToChat">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <span>聊天</span>
+            </div>
+            <div class="nav-item" :class="{ active: currentPage === 'profile' }" @click="currentPage = 'profile'">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+                <span>我的</span>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentPage: 'home',
+                    currentFilter: 'all',
+                    selectedActivity: null,
+                    successTitle: '操作成功',
+                    successMessage: '操作已完成',
+                    showChatButton: false,
+                    newMessage: '',
+                    myActivities: [],
+                    currentChatActivity: null,
+                    messages: [
+                        { own: false, text: '大家好，欢迎加入！', time: '10:30' },
+                        { own: true, text: '谢谢，很高兴加入这个队伍！', time: '10:32' },
+                        { own: false, text: '我们什么时候开始活动？', time: '10:35' }
+                    ],
+                    filters: [
+                        { label: '全部', value: 'all' },
+                        { label: '📚 学习', value: 'study' },
+                        { label: '🏀 运动', value: 'sports' },
+                        { label: '🤝 志愿', value: 'volunteer' },
+                        { label: '🍚 约饭', value: 'meal' },
+                        { label: '🎨 兴趣', value: 'hobby' }
+                    ],
+                    activities: [
+                        {
+                            id: 1,
+                            type: 'study',
+                            title: '考研数学冲刺搭子',
+                            description: '每天早8-晚10，图书馆3楼靠窗位置，互相监督打卡，一起刷真题！',
+                            location: '图书馆3楼',
+                            time: '每天 08:00-22:00',
+                            currentMembers: 2,
+                            targetMembers: 4
+                        },
+                        {
+                            id: 2,
+                            type: 'sports',
+                            title: '周末篮球局',
+                            description: '每周六下午打篮球，锻炼身体，结交新朋友！',
+                            location: '体育馆',
+                            time: '周六 14:00-17:00',
+                            currentMembers: 3,
+                            targetMembers: 6
+                        },
+                        {
+                            id: 3,
+                            type: 'meal',
+                            title: '食堂约饭',
+                            description: '一个人吃饭太无聊，找饭搭子一起！',
+                            location: '第二食堂',
+                            time: '每天 12:00',
+                            currentMembers: 1,
+                            targetMembers: 3
+                        },
+                        {
+                            id: 4,
+                            type: 'hobby',
+                            title: '摄影爱好者',
+                            description: '喜欢摄影的同学一起交流，周末外拍',
+                            location: '校园各处',
+                            time: '周末',
+                            currentMembers: 2,
+                            targetMembers: 5
+                        }
+                    ],
+                    form: {
+                        type: '',
+                        title: '',
+                        location: '',
+                        targetMembers: '2',
+                        time: '今天',
+                        description: ''
+                    }
+                }
+            },
+            computed: {
+                filteredActivities() {
+                    if (this.currentFilter === 'all') {
+                        return this.activities;
+                    }
+                    return this.activities.filter(a => a.type === this.currentFilter);
+                },
+                showBottomNav() {
+                    return ['home', 'publish', 'profile', 'no-activity', 'chat'].includes(this.currentPage);
+                }
+            },
+            methods: {
+                getTypeLabel(type) {
+                    const labels = {
+                        study: '📚 学习',
+                        sports: '🏀 运动',
+                        volunteer: '🤝 志愿',
+                        meal: '🍚 约饭',
+                        hobby: '🎨 兴趣'
+                    };
+                    return labels[type] || type;
+                },
+                goToDetail(activity) {
+                    this.selectedActivity = activity;
+                    this.currentPage = 'detail';
+                },
+                publishActivity() {
+                    if (!this.form.title || !this.form.description) {
+                        alert('请填写完整信息');
+                        return;
+                    }
+
+                    const newActivity = {
+                        id: this.activities.length + 1,
+                        ...this.form,
+                        currentMembers: 1,
+                        targetMembers: parseInt(this.form.targetMembers)
+                    };
+
+                    this.activities.unshift(newActivity);
+                    this.successTitle = '发布成功';
+                    this.successMessage = '您的活动已成功发布，等待其他同学加入吧！';
+                    this.showChatButton = false;
+                    this.currentPage = 'success';
+
+                    // 重置表单
+                    this.form = {
+                        type: '',
+                        title: '',
+                        location: '',
+                        targetMembers: '2',
+                        time: '今天',
+                        description: ''
+                    };
+                },
+                joinActivity() {
+                    if (this.selectedActivity) {
+                        this.myActivities.push(this.selectedActivity);
+                    }
+                    this.successTitle = '加入成功';
+                    this.successMessage = '您已成功加入该队伍，现在可以与队友聊天交流';
+                    this.showChatButton = true;
+                    this.currentPage = 'success';
+                },
+                goToChat() {
+                    if (this.myActivities.length > 0) {
+                        this.currentChatActivity = this.myActivities[0];
+                        this.currentPage = 'chat';
+                    } else {
+                        this.currentPage = 'no-activity';
+                    }
+                },
+                sendMessage() {
+                    if (!this.newMessage.trim()) return;
+
+                    const now = new Date();
+                    const time = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+
+                    this.messages.push({
+                        own: true,
+                        text: this.newMessage,
+                        time: time
+                    });
+
+                    this.newMessage = '';
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
