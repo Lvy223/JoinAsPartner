@@ -70,18 +70,19 @@
           </div>
 
           <div class="card-actions">
+            <!-- ✅ 修复：根据角色显示不同的按钮 -->
             <button
-              v-if="activeTab === 'published'"
+              v-if="activity.role === 3"
               class="action-btn edit"
               @click="editActivity(activity.id)"
             >编辑</button>
             <button
-              v-if="activeTab === 'published'"
+              v-if="activity.role === 3"
               class="action-btn manage"
               @click="manageMembers(activity.id)"
             >管理成员</button>
             <button
-              v-if="activeTab === 'joined'"
+              v-if="activity.role === 1"
               class="action-btn chat"
               @click="goToChat(activity.id)"
             >进入群聊</button>
@@ -89,7 +90,7 @@
               class="action-btn danger"
               @click="handleAction(activity)"
             >
-              {{ activeTab === 'published' ? '解散活动' : '退出活动' }}
+              {{ activity.role === 3 ? '解散活动' : '退出活动' }}
             </button>
           </div>
         </div>
@@ -118,7 +119,6 @@ export default {
       this.isLoading = true
       try {
         if (this.activeTab === 'published') {
-          // 调用后端接口获取用户发布的活动
           const response = await userAPI.getCreatedActivities()
           if (response.code === 200) {
             this.activities = response.data || []
@@ -126,7 +126,6 @@ export default {
             this.activities = []
           }
         } else {
-          // 调用后端接口获取用户参与的活动
           const response = await userAPI.getMyActivities()
           if (response.code === 200) {
             this.activities = response.data || []
@@ -200,12 +199,12 @@ export default {
       alert('成员管理功能开发中...')
     },
     goToChat(activityId) {
-      // 设置当前活动ID，然后跳转到聊天页面
+      // ✅ 修复：设置当前活动ID，然后跳转到聊天页面
       localStorage.setItem('currentActivityId', activityId)
       this.$router.push('/chat')
     },
     async handleAction(activity) {
-      if (this.activeTab === 'published') {
+      if (activity.role === 3) {
         if (confirm('确定要解散这个活动吗？解散后无法恢复。')) {
           await this.disbandActivity(activity.id)
         }
@@ -217,7 +216,6 @@ export default {
     },
     async disbandActivity(id) {
       try {
-        // 调用后端取消活动接口（仅创建者可用）
         const response = await activitiesAPI.cancel(id)
         if (response.code === 200) {
           alert('活动已解散')
@@ -232,8 +230,6 @@ export default {
     },
     async quitActivity(id) {
       try {
-        // 调用后端退出活动接口（需要后端补充 POST /api/activities/<id>/quit）
-        // 暂时使用加入接口的反向，但需要后端支持。这里假设已有 quit 接口。
         const response = await activitiesAPI.quit(id)
         if (response.code === 200) {
           alert('已退出活动')
@@ -257,7 +253,7 @@ export default {
 </script>
 
 <style scoped>
-/* 保持原有样式不变 */
+/* 样式保持不变 */
 .manage-page {
   min-height: 100vh;
   background-color: #f5f5f5;

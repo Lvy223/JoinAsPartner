@@ -1,6 +1,12 @@
 # Flask 主入口（健康检查 + 初始化 + CLI命令）
 # 负责提供 HTTP 接口（如健康检查），并通过 wsgi.py 与 Socket.IO 结合
 
+import eventlet
+eventlet.monkey_patch()
+
+import socketio
+from socketio_server import sio
+
 import logging
 import click
 from datetime import datetime  # 时间处理
@@ -123,8 +129,6 @@ def seed_data():
     db.session.commit()
     click.echo("✅ 测试数据添加成功")
 
-# 当直接运行此文件时（非通过 gunicorn 导入），启动开发服务器
 if __name__ == "__main__":
-    # 开发环境直接运行（不推荐生产使用，生产请用 gunicorn）
-    # 注意：此方式不支持 WebSocket，仅用于测试 HTTP 接口
-    app.run(host="0.0.0.0", port=8000)
+    socketio_app = socketio.WSGIApp(sio, app)
+    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 8000)), socketio_app)

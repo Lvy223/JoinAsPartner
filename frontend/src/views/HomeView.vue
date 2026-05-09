@@ -96,6 +96,27 @@
               </div>
             </div>
             <div class="activity-time">{{ formatTime(activity.created_at) }}</div>
+
+            <!-- ✅ 修复：区分发布者和参与者 -->
+            <div class="card-actions">
+              <!-- 自己发布的活动：显示"我发布的" -->
+              <button
+                v-if="activity.creator_id === currentUserId"
+                class="action-btn published"
+                disabled
+              >
+                我发布的
+              </button>
+
+              <!-- 别人的活动：显示"一键加入" -->
+              <button
+                v-else-if="activity.status === 1"
+                class="action-btn join"
+                @click.stop="joinActivity(activity.id)"
+              >
+                一键加入
+              </button>
+            </div>
           </div>
 
           <!-- 加载更多指示器 -->
@@ -117,7 +138,7 @@
 </template>
 
 <script>
-import { activitiesAPI } from '@/api'
+import { activitiesAPI, userAPI } from '@/api'
 
 export default {
   name: 'HomeView',
@@ -138,13 +159,26 @@ export default {
         { label: '志愿', value: 'volunteer' },
         { label: '约饭', value: 'meal' },
         { label: '兴趣', value: 'hobby' }
-      ]
+      ],
+      currentUserId: null  // ✅ 新增：当前用户ID
     }
   },
-  mounted() {
+  async mounted() {
+    await this.loadCurrentUser()  // ✅ 新增：加载当前用户信息
     this.loadActivities()
   },
   methods: {
+    // ✅ 新增：获取当前用户信息
+    async loadCurrentUser() {
+      try {
+        const response = await userAPI.getProfile()
+        if (response.code === 200 && response.data && response.data.user) {
+          this.currentUserId = response.data.user.id
+        }
+      } catch (err) {
+        console.error('获取用户信息失败:', err)
+      }
+    },
     async loadActivities(isRefresh = false) {
       if (isRefresh) {
         this.currentPage = 1
@@ -160,12 +194,11 @@ export default {
       try {
         const params = {
           page: this.currentPage,
-          per_page: this.pageSize,      // 后端使用 per_page
+          per_page: this.pageSize,
           category: this.activeFilter || undefined
         }
 
         const response = await activitiesAPI.getList(params)
-        // 后端返回格式: { code: 200, data: { activities: [...], total, page, per_page, has_more } }
         const data = response.data || response
         const activities = data.activities || []
         const total = data.total || 0
@@ -185,6 +218,20 @@ export default {
         this.error = '加载失败，请重试'
       } finally {
         this.isLoading = false
+      }
+    },
+    async joinActivity(activityId) {
+      try {
+        const response = await activitiesAPI.join(activityId)
+        if (response.code === 200) {
+          alert('加入成功！')
+          this.loadActivities(true)  // 刷新列表
+        } else {
+          alert(response.message || '加入失败')
+        }
+      } catch (err) {
+        console.error('加入活动失败:', err)
+        alert('加入失败，请重试')
       }
     },
     refreshActivities() {
@@ -267,7 +314,7 @@ export default {
 </script>
 
 <style scoped>
-/* 保持原有样式不变，省略以节省篇幅，实际使用时保留原有 HomeView.vue 的样式 */
+/* 保持原有样式不变 */
 .home-page {
   height: 100vh;
   width: 100vw;
@@ -594,6 +641,7 @@ export default {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
 .activity-card:hover {
@@ -681,6 +729,38 @@ export default {
   font-size: 12px;
   color: #999999;
   text-align: right;
+}
+
+/* 卡片操作按钮样式 */
+.card-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-btn.published {
+  background-color: #e8f5e9;
+  color: #388e3c;
+  cursor: default;
+}
+
+.action-btn.join {
+  background-color: #007aff;
+  color: #ffffff;
+}
+
+.action-btn.join:hover {
+  background-color: #0056b3;
 }
 
 /* 加载更多样式 */

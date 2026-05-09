@@ -48,28 +48,6 @@
           </div>
         </div>
 
-        <!-- 兴趣标签（从 userInfo.interests 读取） -->
-        <div class="section">
-          <h3 class="section-title">兴趣标签</h3>
-          <div class="interest-tags">
-            <span
-              v-for="(interest, index) in (userInfo.interests || [])"
-              :key="index"
-              class="interest-tag"
-            >{{ interest }}</span>
-            <span class="add-tag" @click="goToSettings">+ 编辑</span>
-          </div>
-        </div>
-
-        <!-- 加入时间 -->
-        <div class="section">
-          <h3 class="section-title">账号信息</h3>
-          <div class="account-info">
-            <p>加入时间：{{ formatDate(userInfo.created_at) }}</p>
-            <p>用户名：{{ userInfo.username }}</p>
-          </div>
-        </div>
-
         <!-- 设置选项 -->
         <div class="section">
           <h3 class="section-title">设置</h3>
@@ -83,7 +61,7 @@
               <i class="chevron-icon"></i>
             </button>
             <button class="setting-item login-btn" @click="goToLogin">
-              <span>登录</span>
+              <span>重新登录</span>
               <i class="chevron-icon"></i>
             </button>
           </div>
@@ -101,7 +79,7 @@ export default {
   data() {
     return {
       userInfo: {
-        stats: {}      // 统计数据占位
+        stats: {}
       },
       isLoading: false,
       error: null
@@ -117,26 +95,27 @@ export default {
 
       try {
         const response = await userAPI.getProfile()
-        // 后端返回格式: { code: 200, data: { user: {...}, stats: {...} } }
-        if (response.code === 200 && response.data) {
+        if (response && response.code === 200 && response.data) {
           this.userInfo = {
             ...response.data.user,
             stats: response.data.stats || {}
           }
         } else {
-          this.error = response.message || '加载失败'
+          this.error = (response && response.message) || '加载失败'
         }
       } catch (err) {
         console.error('加载用户信息失败:', err)
-        this.error = '加载用户信息失败，请重试'
+        // 关键修复：如果是401未登录，直接跳转到登录页
+        if (err.response && err.response.status === 401) {
+          localStorage.removeItem('token') // 清除无效token
+          localStorage.removeItem('userInfo')
+          this.$router.push('/login')
+        } else {
+          this.error = '加载用户信息失败，请检查网络连接'
+        }
       } finally {
         this.isLoading = false
       }
-    },
-    formatDate(dateString) {
-      if (!dateString) return '未知'
-      const date = new Date(dateString)
-      return date.toLocaleDateString('zh-CN')
     },
     goToSettings() {
       this.$router.push('/settings')
@@ -152,7 +131,6 @@ export default {
 </script>
 
 <style scoped>
-/* 保持原有样式，与之前相同，仅微调 */
 .profile-page {
   height: 100vh;
   width: 100vw;
@@ -217,6 +195,13 @@ export default {
   color: #48bb78;
 }
 
+.avatar-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .user-details h2 {
   font-size: 18px;
   font-weight: 600;
@@ -265,45 +250,6 @@ export default {
 .stat-label {
   font-size: 12px;
   color: #666666;
-}
-
-.interest-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.interest-tag {
-  padding: 4px 12px;
-  border-radius: 16px;
-  background-color: #e8f4f8;
-  color: #333333;
-  font-size: 14px;
-}
-
-.add-tag {
-  padding: 4px 12px;
-  border-radius: 16px;
-  background-color: #f0f0f0;
-  color: #007aff;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.add-tag:hover {
-  background-color: #e0e0e0;
-}
-
-.account-info {
-  padding: 12px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-}
-
-.account-info p {
-  font-size: 14px;
-  color: #333333;
-  margin: 0 0 4px 0;
 }
 
 .settings {
@@ -375,12 +321,5 @@ export default {
   border-radius: 16px;
   font-size: 14px;
   cursor: pointer;
-}
-
-.avatar-img {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  object-fit: cover;
 }
 </style>

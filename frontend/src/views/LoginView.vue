@@ -160,9 +160,9 @@ export default {
       this.activeTab = tab
       this.errorMessage = ''
     },
+
     async handleLogin() {
       if (this.isSubmitting) return
-
       this.isSubmitting = true
       this.errorMessage = ''
 
@@ -171,11 +171,19 @@ export default {
           username: this.loginForm.username,
           password: this.loginForm.password
         })
+        console.log('登录接口返回:', response) // 调试用
 
-        // 后端返回格式: { code: 200, data: { user: {...}, token: '...' } }
-        if (response.code === 200 && response.data && response.data.token) {
-          localStorage.setItem('token', response.data.token)
-          localStorage.setItem('userInfo', JSON.stringify(response.data.user || {}))
+        const data = response.data || response
+        const token = data.token
+        const user = data.user
+
+        console.log('即将保存的token:', token)
+        console.log('即将保存的user:', user)
+
+        if (response.code === 200 && token) {
+          localStorage.setItem('token', token)
+          localStorage.setItem('userInfo', JSON.stringify(user || {}))
+          console.log('✅ token 已保存到本地:', token)
           this.$router.push('/')
         } else {
           this.errorMessage = response.message || '登录失败'
@@ -187,10 +195,10 @@ export default {
         this.isSubmitting = false
       }
     },
+
     async handleRegister() {
       if (this.isSubmitting) return
 
-      // 简单前端校验
       if (!this.registerForm.username.trim()) {
         this.errorMessage = '请输入用户名'
         return
@@ -212,12 +220,11 @@ export default {
           username: this.registerForm.username,
           password: this.registerForm.password,
           nickname: this.registerForm.nickname,
-          phone: this.registerForm.phone || undefined  // 手机号为可选
+          phone: this.registerForm.phone || undefined
         })
 
         if (response.code === 200) {
           alert('注册成功！请登录')
-          // 自动切换到登录页，并填入用户名
           this.loginForm.username = this.registerForm.username
           this.switchTab('login')
         } else {

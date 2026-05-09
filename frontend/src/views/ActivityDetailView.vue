@@ -148,9 +148,15 @@ export default {
 
       this.isJoining = true
 
+      const timeout = setTimeout(() => {
+        this.isJoining = false
+        alert('请求超时，请重试')
+      }, 10000)
+
       try {
         // 调用真实 API 加入活动
         const response = await activitiesAPI.join(this.activity.id)
+        clearTimeout(timeout)
         if (response.code === 200) {
           // 加入成功后，跳转到成功页面（不再操作 localStorage）
           this.$router.push({
@@ -161,6 +167,7 @@ export default {
           alert(response.message || '加入失败，请重试')
         }
       } catch (error) {
+        clearTimeout(timeout)
         console.error('加入活动失败:', error)
         alert('加入失败，请重试')
       } finally {
@@ -403,7 +410,7 @@ export default {
   background-color: #ffffff;
   padding: 16px 24px;
   border-top: 1px solid #e0e0e0;
-  z-index: 10;
+  z-index: 9;
 }
 
 .join-button {

@@ -1,9 +1,6 @@
 # 活动相关的 HTTP 路由处理模块
 # 提供活动加入、退出等 RESTful 接口，并与 WebSocket 状态联动
 
-# routes/activity.py
-# 活动相关的 HTTP 路由处理模块（完整版）
-
 from flask import Blueprint, request, jsonify, g
 from datetime import datetime
 from models import db, Activity, UserActivity, ActivityFeed, UserReview, User
@@ -53,45 +50,50 @@ def create_activity():
     except Exception:
         return jsonify({'code': 400, 'message': '时间格式错误，请使用 ISO 格式'}), 400
 
-    activity = Activity(
-        creator_id=g.current_user.id,
-        title=data['title'],
-        description=data.get('description', ''),
-        category=data.get('category'),
-        tags=data.get('tags', []),
-        start_time=start_time,
-        end_time=end_time,
-        deadline=deadline,
-        location_name=data.get('location_name'),
-        address_detail=data.get('address_detail'),
-        longitude=data.get('longitude'),
-        latitude=data.get('latitude'),
-        max_participants=data.get('max_participants', 0),
-        current_participants=1,
-        status=0  # 筹备中
-    )
-    db.session.add(activity)
-    db.session.commit()
+    try:
+        activity = Activity(
+            creator_id=g.current_user.id,
+            title=data['title'],
+            description=data.get('description', ''),
+            category=data.get('category'),
+            tags=data.get('tags', []),
+            start_time=start_time,
+            end_time=end_time,
+            deadline=deadline,
+            location_name=data.get('location_name'),
+            address_detail=data.get('address_detail'),
+            longitude=data.get('longitude'),
+            latitude=data.get('latitude'),
+            max_participants=data.get('max_participants', 0),
+            current_participants=1,
+            status=0  # 筹备中
+        )
+        db.session.add(activity)
+        db.session.commit()
 
-    # 创建者自动加入（角色为创建者）
-    user_activity = UserActivity(
-        user_id=g.current_user.id,
-        activity_id=activity.id,
-        role=3,  # 3=创建者
-        status=1
-    )
-    db.session.add(user_activity)
-    db.session.commit()
+        # 创建者自动加入（角色为创建者）
+        user_activity = UserActivity(
+            user_id=g.current_user.id,
+            activity_id=activity.id,
+            role=3,  # 3=创建者
+            status=1
+        )
+        db.session.add(user_activity)
+        db.session.commit()
 
-    # 清除相关缓存（支持通配符）
-    for key in redis_client.scan_iter("activity_feed:*"):
-        redis_client.delete(key)
+        # 清除相关缓存（支持通配符）
+        for key in redis_client.scan_iter("activity_feed:*"):
+            redis_client.delete(key)
 
-    return jsonify({
-        'code': 200,
-        'message': '活动创建成功',
-        'data': activity.to_dict()
-    })
+        return jsonify({
+            'code': 200,
+            'message': '活动创建成功',
+            'data': activity.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"创建活动失败: {str(e)}")
+        return jsonify({'code': 500, 'message': '创建活动失败，请重试'}), 500
 
 @activity_bp.route("/activities/<int:activity_id>", methods=["GET"])
 def get_activity_detail(activity_id):
@@ -317,7 +319,11 @@ def join_activity(activity_id):
 
     # 校验活动状态
     if activity.status not in [0, 1]:
-        return jsonify({'code': 400, 'message': '该活动已不可加入'}), 400
+        return jsonify({'code': 400, 'message': '该活动已结束或不可加入'}), 400
+
+    # 检查是否已满员
+    if activity.max_participants > 0 and activity.current_participants >= activity.max_participants:
+        return jsonify({'code': 400, 'message': '活动已满员'}), 400
 
     # 检查是否已加入
     existing = UserActivity.query.filter_by(

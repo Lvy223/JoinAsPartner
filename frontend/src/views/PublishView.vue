@@ -113,7 +113,7 @@
           >
         </div>
 
-        <!-- 位置坐标（可选，可通过地图选点） -->
+        <!-- 位置坐标（可选） -->
         <div class="form-row">
           <div class="form-group half">
             <label class="form-label">经度</label>
@@ -178,7 +178,6 @@ export default {
         title: '',
         description: '',
         category: '',
-        tags: [],
         start_time: '',
         end_time: '',
         deadline: '',
@@ -194,106 +193,61 @@ export default {
   },
   methods: {
     goBack() {
-      this.$router.push('/')
+      this.$router.back()
     },
-    // 将逗号分隔的字符串转换为数组
-    parseTags() {
-      if (!this.tagsInput.trim()) {
-        this.formData.tags = []
-        return
-      }
-      this.formData.tags = this.tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag)
-    },
-    // 获取当前地理位置（经纬度）
     getCurrentLocation() {
-      if (!navigator.geolocation) {
-        alert('您的浏览器不支持地理定位')
-        return
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            this.formData.longitude = position.coords.longitude
+            this.formData.latitude = position.coords.latitude
+          },
+          (error) => {
+            console.error('获取位置失败', error)
+            alert('无法获取当前位置')
+          }
+        )
+      } else {
+        alert('浏览器不支持地理定位')
       }
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          this.formData.longitude = position.coords.longitude
-          this.formData.latitude = position.coords.latitude
-          alert('已获取当前位置坐标')
-        },
-        (error) => {
-          console.error('获取位置失败:', error)
-          alert('获取位置失败，请手动输入坐标')
-        }
-      )
-    },
-    // 格式化日期时间为后端接受的格式（ISO 字符串，不含毫秒和 Z）
-    formatDateTime(dateTimeLocal) {
-      if (!dateTimeLocal) return null
-      // datetime-local 返回格式 "YYYY-MM-DDThh:mm"
-      return dateTimeLocal + ':00'  // 补上秒数，变成 "YYYY-MM-DDThh:mm:ss"
     },
     async publishActivity() {
-      // 验证必填字段
-      if (!this.formData.title.trim()) {
-        alert('请填写活动标题')
-        return
-      }
-      if (!this.formData.description.trim()) {
-        alert('请填写活动描述')
-        return
-      }
-      if (!this.formData.category) {
-        alert('请选择活动分类')
-        return
-      }
-      if (!this.formData.start_time) {
-        alert('请选择开始时间')
-        return
-      }
-      if (!this.formData.end_time) {
-        alert('请选择结束时间')
-        return
-      }
-      if (!this.formData.location_name.trim()) {
-        alert('请填写地点名称')
-        return
-      }
+      if (this.isSubmitting) return
 
-      // 解析标签
-      this.parseTags()
-
-      // 构建请求数据
-      const requestData = {
-        title: this.formData.title.trim(),
-        description: this.formData.description.trim(),
-        category: this.formData.category,
-        tags: this.formData.tags,
-        start_time: this.formatDateTime(this.formData.start_time),
-        end_time: this.formatDateTime(this.formData.end_time),
-        deadline: this.formatDateTime(this.formData.deadline),
-        location_name: this.formData.location_name.trim(),
-        address_detail: this.formData.address_detail.trim() || undefined,
-        longitude: this.formData.longitude || undefined,
-        latitude: this.formData.latitude || undefined,
-        max_participants: this.formData.max_participants
+      // 简单校验
+      if (!this.formData.title.trim() || !this.formData.description.trim() || !this.formData.category) {
+        alert('请填写标题、描述和分类')
+        return
       }
 
       this.isSubmitting = true
+
       try {
-        const response = await activitiesAPI.create(requestData)
-        // 后端返回格式: { code: 200, message: '活动创建成功', data: {...} }
+        // 组装标签数据
+        const tags = this.tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+
+        const payload = {
+          ...this.formData,
+          tags: JSON.stringify(tags)
+        }
+
+        const response = await activitiesAPI.create(payload)
+
         if (response.code === 200) {
-          // 跳转到成功页面
-          this.$router.push({
-            path: '/success',
-            query: { type: 'publish' }
-          })
+          alert('发布成功！')
+
+          // 发送事件通知聊天页面刷新活动列表（如果 eventBus 存在）
+          if (this.$eventBus) {
+            this.$eventBus.$emit('activity-updated')
+          }
+
+          this.$router.push('/')
         } else {
           alert(response.message || '发布失败，请重试')
         }
       } catch (error) {
         console.error('发布活动失败:', error)
-        let errorMsg = '发布失败，请重试'
-        if (error.response && error.response.data && error.response.data.message) {
-          errorMsg = error.response.data.message
-        }
-        alert(errorMsg)
+        alert('发布失败，请检查网络连接')
       } finally {
         this.isSubmitting = false
       }

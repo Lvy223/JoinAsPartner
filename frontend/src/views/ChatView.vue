@@ -3,10 +3,29 @@
     <!-- 顶部导航 -->
     <div class="chat-header">
       <button class="back-btn" @click="goBack">←</button>
-      <h3>{{ currentActivity ? currentActivity.title : '队伍聊天' }}</h3>
+      <div class="header-center" @click="toggleActivityMenu">
+        <h3>{{ currentActivity ? currentActivity.title : '队伍聊天' }}</h3>
+        <span v-if="myActivities.length > 1" class="dropdown-arrow">▼</span>
+      </div>
       <button class="menu-btn" @click="toggleMenu">
         <i class="menu-icon"></i>
       </button>
+
+      <!-- 活动切换菜单 -->
+      <div v-if="showActivityMenu" class="activity-switch-overlay" @click="showActivityMenu = false">
+        <div class="activity-switch-popup" @click.stop>
+          <div
+            v-for="act in myActivities"
+            :key="act.id"
+            class="activity-option"
+            :class="{ active: currentActivity?.id === act.id }"
+            @click="switchActivity(act)"
+          >
+            {{ act.title }}
+            <span v-if="currentActivity?.id === act.id">✓</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 菜单弹出层 -->
@@ -43,7 +62,7 @@
           v-for="msg in messages"
           :key="msg.id || msg.timestamp"
           class="message"
-          :class="{ own: msg.user_id === currentUserId }"
+          :class="{ own: Number(msg.user_id) === Number(currentUserId) }"
         >
           <div class="message-avatar">{{ getUserInitial(msg.user_id) }}</div>
           <div class="message-content">
@@ -86,26 +105,26 @@
 </template>
 
 <script>
-import { userAPI } from '@/api'
+import { userAPI, activitiesAPI } from '@/api'
 import socketService from '@/utils/socket'
 
 export default {
   name: 'ChatView',
   data() {
     return {
-      currentActivity: null,     // 当前聊天活动对象
-      myActivities: [],          // 用户参与的所有活动列表（从后端获取）
-      currentUserId: null,       // 当前登录用户ID
-      messages: [],              // 消息数组
+      currentActivity: null,
+      myActivities: [],
+      currentUserId: null,
+      messages: [],
       newMessage: '',
       pendingMessage: '',
       isSending: false,
       isLoading: false,
       error: null,
       showMenu: false,
+      showActivityMenu: false,
       offlineMessages: [],
       isSocketConnected: false,
-      // 保存监听器函数引用，用于清理
       socketEventHandlers: {
         connect: null,
         newMessage: null,
@@ -121,54 +140,30 @@ export default {
     await this.loadMyActivities()
     this.initWebSocket()
     this.setupSocketListeners()
+    this.$eventBus?.$on('activity-updated', this.handleActivityUpdated)
   },
   beforeUnmount() {
-    // 清理 WebSocket 监听器
     const socket = socketService.getSocket()
     if (socket) {
-      if (this.socketEventHandlers.connect) {
-        socket.off('connect', this.socketEventHandlers.connect)
-      }
-      if (this.socketEventHandlers.newMessage) {
-        socket.off('server_new_message', this.socketEventHandlers.newMessage)
-      }
-      if (this.socketEventHandlers.joined) {
-        socket.off('server_joined', this.socketEventHandlers.joined)
-      }
-      if (this.socketEventHandlers.offlineMessage) {
-        socket.off('server_offline_message', this.socketEventHandlers.offlineMessage)
-      }
-      if (this.socketEventHandlers.error) {
-        socket.off('server_error', this.socketEventHandlers.error)
-      }
-      if (this.socketEventHandlers.kick) {
-        socket.off('server_kick', this.socketEventHandlers.kick)
-      }
+      Object.values(this.socketEventHandlers).forEach(handler => {
+        if (handler) socket.off(handler)
+      })
     }
-    // 离开活动房间
     if (this.currentActivity) {
       socketService.leaveActivityRoom(this.currentActivity.id)
     }
-  },
-  watch: {
-    '$route': {
-      handler() {
-        this.refreshChat()
-      },
-      immediate: false
-    }
+    this.$eventBus?.$off('activity-updated', this.handleActivityUpdated)
   },
   methods: {
+    handleActivityUpdated() {
+      console.log('检测到活动更新，正在刷新聊天列表...')
+      this.loadMyActivities()
+    },
     async loadCurrentUser() {
       try {
         const res = await userAPI.getProfile()
         if (res.code === 200 && res.data && res.data.user) {
           this.currentUserId = res.data.user.id
-        } else {
-          const userInfo = localStorage.getItem('userInfo')
-          if (userInfo) {
-            this.currentUserId = JSON.parse(userInfo).id
-          }
         }
       } catch (err) {
         console.error('获取用户信息失败:', err)
@@ -178,33 +173,35 @@ export default {
       this.isLoading = true
       this.error = null
       try {
-        const response = await userAPI.getMyActivities()
-        if (response.code === 200 && Array.isArray(response.data)) {
-          this.myActivities = response.data.map(item => {
-            const act = item
-            return {
-              id: act.id,
-              title: act.title,
-              description: act.description,
-              location: act.location_name || '未知地点',
-              time: act.start_time ? new Date(act.start_time).toLocaleString() : '时间待定',
-              currentMembers: act.current_participants || 0,
-              targetMembers: act.max_participants || 0,
-              creator_id: act.creator_id,
-              creator_nickname: act.creator_nickname,
-              status: act.status,
-              role: item.role,
-              joined_at: item.joined_at
-            }
-          })
-        } else {
-          this.myActivities = []
-          console.warn('获取活动列表失败:', response.message)
+        if (!this.currentUserId) {
+          await this.loadCurrentUser()
         }
+        if (!this.currentUserId) {
+          this.error = '无法获取用户身份'
+          return
+        }
+
+        const listRes = await activitiesAPI.getList({ page: 1, per_page: 100 })
+        const allActivities = listRes?.data?.activities || listRes?.activities || []
+
+        const relatedActs = allActivities.filter(act => {
+          if (act.creator_id === this.currentUserId) return true
+          if (act.participants && Array.isArray(act.participants)) {
+            return act.participants.some(p => p.user_id === this.currentUserId)
+          }
+          if (act.role === 1 || act.role === 3) return true
+          return false
+        })
+
+        this.myActivities = relatedActs.map(item => ({
+          id: item.id,
+          title: item.title,
+          creator_id: item.creator_id,
+          role: item.role || (item.creator_id === this.currentUserId ? 3 : 1)
+        }))
       } catch (err) {
         console.error('加载活动列表失败:', err)
-        this.error = '加载活动列表失败，请重试'
-        this.myActivities = []
+        this.error = '加载活动列表失败'
       } finally {
         this.isLoading = false
         this.determineCurrentActivity()
@@ -212,22 +209,48 @@ export default {
     },
     determineCurrentActivity() {
       const routeId = this.$route.query.activityId
-      const storedId = localStorage.getItem('currentActivityId')
-      const activityId = routeId || storedId
+      let activityId = routeId || localStorage.getItem('currentActivityId')
+
       if (activityId && this.myActivities.length) {
         this.currentActivity = this.myActivities.find(a => String(a.id) === String(activityId))
       }
+
       if (!this.currentActivity && this.myActivities.length) {
         this.currentActivity = this.myActivities[0]
       }
+
       if (this.currentActivity) {
         localStorage.setItem('currentActivityId', this.currentActivity.id)
-        // 如果 WebSocket 已连接，立即加入房间；否则等待 connect 事件触发
         const socket = socketService.getSocket()
-        if (socket && socket.connected) {
+        if (socket?.connected) {
           socketService.joinActivityRoom(this.currentActivity.id)
         }
+      } else {
+        this.error = '您还没有参与任何活动，请先加入或创建一个活动'
       }
+    },
+    toggleActivityMenu() {
+      if (this.myActivities.length > 1) {
+        this.showActivityMenu = !this.showActivityMenu
+      }
+    },
+    switchActivity(activity) {
+      if (this.currentActivity?.id !== activity.id) {
+        // 离开旧房间
+        if (this.currentActivity) {
+          socketService.leaveActivityRoom(this.currentActivity.id)
+        }
+        // 切换活动
+        this.currentActivity = activity
+        this.messages = []
+        localStorage.setItem('currentActivityId', activity.id)
+        // 加入新房间
+        const socket = socketService.getSocket()
+        if (socket?.connected) {
+          socketService.joinActivityRoom(activity.id)
+        }
+      }
+      this.showActivityMenu = false
     },
     initWebSocket() {
       const token = localStorage.getItem('token')
@@ -241,9 +264,7 @@ export default {
       const socket = socketService.getSocket()
       if (!socket) return
 
-      // 连接成功时加入房间
       this.socketEventHandlers.connect = () => {
-        console.log('WebSocket connected, joining room if activity exists')
         this.isSocketConnected = true
         if (this.currentActivity?.id) {
           socketService.joinActivityRoom(this.currentActivity.id)
@@ -251,24 +272,19 @@ export default {
       }
       socket.on('connect', this.socketEventHandlers.connect)
 
-      // 新消息
       this.socketEventHandlers.newMessage = (payload) => {
         if (String(payload.activity_id) === String(this.currentActivity?.id)) {
           this.messages.push(payload)
           this.scrollToBottom()
-        } else {
-          console.log('收到其他活动消息:', payload)
         }
       }
       socket.on('server_new_message', this.socketEventHandlers.newMessage)
 
-      // 加入房间确认
       this.socketEventHandlers.joined = (data) => {
         console.log('已加入房间:', data)
       }
       socket.on('server_joined', this.socketEventHandlers.joined)
 
-      // 离线消息
       this.socketEventHandlers.offlineMessage = (msg) => {
         if (String(msg.activity_id) === String(this.currentActivity?.id)) {
           this.messages.push(msg)
@@ -279,7 +295,6 @@ export default {
       }
       socket.on('server_offline_message', this.socketEventHandlers.offlineMessage)
 
-      // 错误
       this.socketEventHandlers.error = (err) => {
         console.error('服务器错误:', err)
         if (err.reason === 'Not a member of this activity') {
@@ -288,7 +303,6 @@ export default {
       }
       socket.on('server_error', this.socketEventHandlers.error)
 
-      // 被踢下线
       this.socketEventHandlers.kick = (data) => {
         alert(data.reason || '您在其他设备登录，将被强制下线')
         localStorage.removeItem('token')
@@ -299,7 +313,6 @@ export default {
     async refreshChat() {
       this.determineCurrentActivity()
       if (this.currentActivity) {
-        // 如果已连接，立即加入；否则 connect 事件会处理
         const socket = socketService.getSocket()
         if (socket?.connected) {
           socketService.joinActivityRoom(this.currentActivity.id)
@@ -310,7 +323,6 @@ export default {
       this.scrollToBottom()
     },
     async loadHistoryMessages() {
-      // 加载离线消息（示例，可根据实际需求扩展）
       this.isLoading = false
       const offlineForThis = this.offlineMessages.filter(
         m => String(m.activity_id) === String(this.currentActivity?.id)
@@ -377,7 +389,6 @@ export default {
 </script>
 
 <style scoped>
-/* 样式保持不变，与原有 ChatView.vue 相同 */
 .chat-page {
   display: flex;
   flex-direction: column;
@@ -391,12 +402,23 @@ export default {
   padding: 16px;
   background: #ffffff;
   border-bottom: 1px solid #e0e0e0;
+  position: relative;
 }
-.chat-header h3 {
+.header-center {
   flex: 1;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  gap: 4px;
+}
+.header-center h3 {
   font-size: 18px;
   font-weight: 600;
+}
+.dropdown-arrow {
+  font-size: 12px;
+  color: #999;
 }
 .back-btn {
   background: none;
@@ -420,6 +442,41 @@ export default {
   background-size: contain;
   background-repeat: no-repeat;
 }
+
+/* 活动切换弹出 */
+.activity-switch-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  padding-top: 60px;
+}
+.activity-switch-popup {
+  background: white;
+  border-radius: 12px;
+  width: 80%;
+  max-width: 300px;
+  max-height: 300px;
+  overflow-y: auto;
+  align-self: flex-start;
+}
+.activity-option {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.activity-option:hover { background: #f5f5f5; }
+.activity-option.active { color: #007aff; font-weight: 600; }
+
+/* 菜单 */
 .menu-overlay {
   position: fixed;
   top: 0;
@@ -469,6 +526,8 @@ export default {
 .cancel-item:hover {
   background-color: #e0e0e0;
 }
+
+/* 聊天消息 */
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -504,6 +563,7 @@ export default {
   justify-content: center;
   font-size: 14px;
   margin: 0 10px;
+  flex-shrink: 0;
 }
 .message-content {
   max-width: 70%;
@@ -529,6 +589,8 @@ export default {
   margin-top: 4px;
   text-align: right;
 }
+
+/* 输入区 */
 .chat-input {
   display: flex;
   padding: 12px 16px;
